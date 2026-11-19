@@ -1,1 +1,43 @@
+name: teleport-k8s-test   # only matters if a workflow name is set in your token rules (must match)
 
+on: workflow_dispatch
+
+env:
+  TELEPORT_PROXY_ADDR: "kimlisa-v19-2.cloud.gravitational.io:443"
+  TELEPORT_JOIN_TOKEN_NAME: "gha-kimlisa-teleport-testing-bot"
+  TELEPORT_K8S_CLUSTER_NAME: "minikube"
+
+jobs:
+  demo:
+    permissions:
+      id-token: write
+      contents: read
+    name: Teleport Kubernetes Access
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v5
+
+    # Replaces teleport-actions/setup (it only downloads from the prod CDN)
+    - name: Fetch Teleport binaries (staging CDN, alpha)
+      run: |
+        V=19.0.0-alpha.2
+        F=teleport-ent-v${V}-linux-amd64-bin.tar.gz
+        curl -fsSLO https://cdn.cloud.gravitational.io/$F
+        tar xzf $F
+        echo "$PWD/teleport-ent" >> "$GITHUB_PATH"
+
+    - name: Fetch credentials using Machine & Workload Identity
+      uses: teleport-actions/auth-k8s@v2
+      with:
+        proxy: ${{ env.TELEPORT_PROXY_ADDR }}
+        token: ${{ env.TELEPORT_JOIN_TOKEN_NAME }}
+        kubernetes-cluster: ${{ env.TELEPORT_K8S_CLUSTER_NAME }}
+        anonymous-telemetry: 1
+
+    - name: Check Kubernetes connectivity
+      run: kubectl version
+
+    - name: Kubernetes access check
+      run: kubectl get pods -A > /dev/null && echo "kubectl OK"
