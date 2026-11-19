@@ -1,0 +1,38 @@
+name: teleport-ssh-test            # only needed if you set a workflow name in step 2 (must match)
+on:
+  push:
+    branches:
+    - main
+  workflow_dispatch: {}            # lets you run it manually from the Actions tab
+jobs:
+  demo:
+    permissions:
+      id-token: write              # required for the GitHub OIDC join
+      contents: read
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    # Replaces teleport-actions/setup (it only downloads from the prod CDN)
+    - name: Fetch Teleport binaries (staging CDN, alpha)
+      run: |
+        V=19.0.0-alpha.2
+        F=teleport-ent-v${V}-linux-amd64-bin.tar.gz
+        curl -fsSLO https://cdn.cloud.gravitational.io/$F
+        tar xzf $F
+        echo "$PWD/teleport-ent" >> "$GITHUB_PATH"
+
+    - name: Fetch credentials using Machine & Workload Identity
+      id: auth
+      uses: teleport-actions/auth@v2
+      with:
+        proxy: kimlisa-v19-2.cloud.gravitational.io:443
+        token: github-actions-ssh
+        anonymous-telemetry: 1
+
+    - name: List nodes (tsh)
+      run: tsh ls > /dev/null && echo "tsh ls OK"
+
+    - name: SSH to node
+      run: tsh ssh root@lisakim-macbookpro true && echo "SSH OK"
